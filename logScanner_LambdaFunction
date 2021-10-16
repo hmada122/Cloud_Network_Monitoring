@@ -1,0 +1,35 @@
+import json
+import boto3
+import base64
+import requests
+import telnetlib
+
+def LogAnalysisFunction(event, context):
+    sns = boto3.client('sns')
+    for record in event['Records']:
+        payload = base64.b64decode(record["kinesis"]["data"])
+        print("Decoded payload: " + str(payload))
+        if 'changed state to down' in str(payload):
+            interface = str(payload).split('@')[1].split(':')[1].replace(',','')
+            routerIP = str(payload).split('@')[2].split(':')[1].split(',')[0].replace('"',"")
+            print ("interface " + interface + " on " + routerIP + " is down")
+            tn = telnetlib.Telnet("172.16.2.156",1212)
+            message = {
+                    "function":"shutinterface",
+                    "interface": interface,
+                    "state": "true",
+                    "routerIP": 192.168.122.100 
+                    }
+            print(str(message).encode('ascii')+ b"")
+            tn.write(str(message).encode('ascii')+ b"\n")
+            print(tn.read_all())
+        if 'Neighbor Down' in str(payload):
+            print("Sending Messages")
+            response = sns.publish(TopicArn='arn:aws:sns:eu-west-1:083149494550:TU766', Message= str(payload))
+            print ("SNS response: "+str(response))                  
+        #   
+               
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Hello from Lambda!')
+
